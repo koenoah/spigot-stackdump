@@ -1,5 +1,5 @@
-name: DumpStack
-version: 0.1-SNAPSHOT
-main: me.nexodus.dumpstack.DumpStackPlugin
+name: StackDump
+version: 0.2-SNAPSHOT
+main: me.nexodus.stackdump.StackDumpPlugin
 api-version: '1.20'
 description: This plugin adds a quality of life utility to dump all the stacks of an item into a chest/barrel.
