@@ -82,7 +82,7 @@ public class Core {
 
             if (item.hasItemMeta()) continue;
 
-            borrowed.put(slot, item);
+            borrowed.put(slot, item.clone());
             item.setAmount(0);
         }
 
@@ -93,11 +93,12 @@ public class Core {
 
             HashMap<Integer, ItemStack> remainder;
             if (quickSmelt) {
-                remainder = chestInv.addItem(QuickSmelt.checkAndRetrieve(item, player));
+                remainder = chestInv.addItem(QuickSmelt.smeltNoExp(item, player));
             } else {
                 remainder = chestInv.addItem(item);
             }
-            if (!remainder.isEmpty()) break;
+            if (!remainder.isEmpty()) break;     
+            if (quickSmelt) QuickSmelt.onlyExp(item, player); // To prevent EXP duping the EXP is delayed until it is confirmed remainder is not empty
 
             it.remove();
         }
@@ -119,11 +120,11 @@ public class Core {
         if (!stealthy) {
             Sound storeSound = Sound.BLOCK_CHEST_CLOSE; //default
             Block block = event.getClickedBlock();
-            if (block.getType() == Material.BARREL); storeSound = Sound.BLOCK_BARREL_CLOSE;
-            if (block.getType() == Material.SHULKER_BOX); storeSound = Sound.BLOCK_SHULKER_BOX_CLOSE;
-            if (block.getType() == Material.ENDER_CHEST); storeSound = Sound.BLOCK_ENDER_CHEST_CLOSE;
+            if (block.getType() == Material.BARREL) storeSound = Sound.BLOCK_BARREL_CLOSE;
+            if (block.getType() == Material.SHULKER_BOX) storeSound = Sound.BLOCK_SHULKER_BOX_CLOSE;
+            if (block.getType() == Material.ENDER_CHEST) storeSound = Sound.BLOCK_ENDER_CHEST_CLOSE;
 
-            world.playSound(loc, storeSound, 1.0f, 1.0f);
+            world.playSound(loc, storeSound, 0.5f, 1.0f);
         }
 
         return;

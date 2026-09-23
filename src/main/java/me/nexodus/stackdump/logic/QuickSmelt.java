@@ -35,7 +35,7 @@ public class QuickSmelt {
            Map.entry(Material.GOLD_ORE, GOLD_SET)
             );
 
-    public static ItemStack checkAndRetrieve(ItemStack item, Player player) {
+    public static ItemStack smeltNow(ItemStack item, Player player) {
         boolean stealthy = StackDumpPlugin.getInstance().getConfig().getBoolean("settings.stealth");
         if (smeltMap.containsKey(item.getType())) {
             MaterialSet set = smeltMap.get(item.getType());
@@ -44,9 +44,9 @@ public class QuickSmelt {
             int exp = (int)(item.getAmount() * set.exp);
             player.giveExp(exp);
             if (!stealthy) {
-                player.getLocation().getWorld().playSound(player.getLocation(), Sound.ITEM_FLINTANDSTEEL_USE, 1.0f, 1.0f);
+                player.getLocation().getWorld().playSound(player.getLocation(), Sound.ITEM_FLINTANDSTEEL_USE, 0.5f, 1.0f);
                 if (exp > 0) {
-                    player.getLocation().getWorld().playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.0f);
+                    player.getLocation().getWorld().playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.5f, 1.0f);
                 }
             }
 
@@ -54,5 +54,32 @@ public class QuickSmelt {
         }
 
         return item;
+    }
+
+    public static ItemStack smeltNoExp(ItemStack item, Player player) {
+        if (smeltMap.containsKey(item.getType())) {
+            MaterialSet set = smeltMap.get(item.getType());
+            ItemStack smeltedItem = new ItemStack(set.material, item.getAmount());
+
+            return smeltedItem;
+        }
+
+        return item;
+    }
+
+    public static void onlyExp(ItemStack item, Player player) {
+        boolean stealthy = StackDumpPlugin.getInstance().getConfig().getBoolean("settings.stealth");
+        if (smeltMap.containsKey(item.getType())) {
+            MaterialSet set = smeltMap.get(item.getType());
+
+            int exp = (int)(item.getAmount() * set.exp);
+            player.giveExp(exp);
+            if (!stealthy) { // Sound of both smelting and EXP due to the specific edge case scenario of this method to be used if previously results in cancel
+                player.getLocation().getWorld().playSound(player.getLocation(), Sound.BLOCK_FURNACE_FIRE_CRACKLE, 3.0f, 1.2f);
+                if (exp > 0) {
+                    player.getLocation().getWorld().playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.5f, 1.0f);
+                }
+            }
+        }
     }
 }
