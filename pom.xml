@@ -4,7 +4,7 @@
 
   <groupId>me.nexodus.stackdump</groupId>
   <artifactId>stack-dump</artifactId>
-  <version>0.3.0</version>
+  <version>0.3.1</version>
   <name>[ChestUtil]StackDump</name>
 
   <url>http://maven.apache.org</url>

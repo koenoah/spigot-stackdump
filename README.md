@@ -1,5 +1,5 @@
 ## StackDump [Chest Utility Stack Dumping]
-#Current version: 0.3.0
+#Current version: 0.3.1
 It is functioning on the surface, but still many other features are pending + some common bug fixes.
 
 **Description:**
