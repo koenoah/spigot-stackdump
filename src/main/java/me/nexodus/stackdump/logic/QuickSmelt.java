@@ -1,4 +1,4 @@
-package me.nexodus.stackdump.util;
+package me.nexodus.stackdump.logic;
 
 import java.util.Map;
 
@@ -53,6 +53,6 @@ public class QuickSmelt {
             return smeltedItem;
         }
 
-        return item.clone();
+        return item;
     }
 }

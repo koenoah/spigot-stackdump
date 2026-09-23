@@ -1,4 +1,6 @@
 settings:
+  stealth: false
+  sorting: true
   offhand-allowed: true
   quicksmelt-allowed: true
-  stealth: false
+  display-text-notifications: true

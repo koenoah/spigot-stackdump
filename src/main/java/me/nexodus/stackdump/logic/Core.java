@@ -8,6 +8,7 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.World;
+import org.bukkit.block.Block;
 import org.bukkit.block.Container;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
@@ -19,136 +20,112 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 
 import me.nexodus.stackdump.StackDumpPlugin;
-import me.nexodus.stackdump.util.QuickSmelt;
+import me.nexodus.stackdump.util.ThrottlerUtil;
 
 public class Core {
-    private static int getStacks(int amount, int limit) {
-        int total = amount / limit;
-        if (amount % limit > 1) total += 1;
-
-        return total;
-    }
-
-    public static boolean dump(PlayerInteractEvent event) {
-        if (event.getAction() != Action.RIGHT_CLICK_BLOCK) return false;
+    public static void dump(PlayerInteractEvent event) {
+        if (event.getAction() != Action.RIGHT_CLICK_BLOCK) return;
 
         Player player = event.getPlayer();
-        if (!player.isSneaking()) return false;
-        if (event.getHand() != EquipmentSlot.HAND) return false;
+        if (!player.isSneaking()) return;
+        if (event.getHand() != EquipmentSlot.HAND) return;
+
+        Inventory chestInv;
 
         if (event.getClickedBlock().getState() instanceof Container chest) {
-            FileConfiguration config = StackDumpPlugin.getInstance().getConfig();
+            chestInv = chest.getInventory();
+        } else if (event.getClickedBlock().getType() == Material.ENDER_CHEST) {
+            chestInv = player.getEnderChest();
+        } else return;
 
-            //Config
-            boolean stealthy = config.getBoolean("settings.stealth");
-            boolean quickSmelt = config.getBoolean("settings.quicksmelt-allowed");
-            boolean offHandAllowed = config.getBoolean("settings.offhand-allowed");
 
-            Inventory chestInv = chest.getInventory();
+        FileConfiguration config = StackDumpPlugin.getInstance().getConfig();
 
-            event.setCancelled(true);
+        //Config
+        boolean stealthy = config.getBoolean("settings.stealth");
+        boolean quickSmelt = config.getBoolean("settings.quicksmelt-allowed");
+        boolean offHandAllowed = config.getBoolean("settings.offhand-allowed");
 
-            PlayerInventory playerInv = player.getInventory();
-            ItemStack playerHand = playerInv.getItemInMainHand();
+        event.setCancelled(true);
 
-            if (playerHand == null || playerHand.getType() == Material.AIR ||
-                    playerHand.getType() == Material.CHEST ||
-                    playerHand.getType() == Material.BARREL ||
-                    playerHand.getType() == Material.ENDER_CHEST ||
-                    playerHand.getType() == Material.SHULKER_BOX
-                    ) return false;
+        //Avoid spamming here with a throttler
+        if (ThrottlerUtil.checkThrottle(player)) {
+            // todo Throttle message
+            return;
+        } else {
+            ThrottlerUtil.setThrottleOnPlayer(player);
+        }
 
-            Material targetMaterial = playerHand.getType();
+        PlayerInventory playerInv = player.getInventory();
+        ItemStack playerHand = playerInv.getItemInMainHand();
 
-            int emptySlots = 0;
-            int occupiedBySame = 0;
-            for (ItemStack item : chestInv) {
-                if (item == null || item.getType() == Material.AIR) {
-                    emptySlots += 1;
-                } else if (item.getType() == targetMaterial) {
-                    occupiedBySame += item.getAmount();
-                }
+        if (playerHand == null || playerHand.getType() == Material.AIR ||
+                playerHand.getType() == Material.CHEST ||
+                playerHand.getType() == Material.BARREL ||
+                playerHand.getType() == Material.ENDER_CHEST ||
+                playerHand.getType() == Material.SHULKER_BOX
+                ) return;
+
+        Material targetMaterial = playerHand.getType();
+
+        HashMap<Integer, ItemStack> borrowed = new HashMap<>();
+        for (int slot = 0; slot <= 40; slot++) { //Inventory max at 35 to avoid crossing into armor or offhand
+            if (slot > 35 && slot != 40) continue;
+
+            //OffHand Check:
+            if (slot == 40) {
+                if (!offHandAllowed) continue;
             }
 
-            int amount = 0;
-            HashMap<Integer, ItemStack> borrowed = new HashMap<>();
-            for (int slot = 0; slot <= 35; slot++) { //Inventory max at 35 to avoid crossing into armor or offhand
-                ItemStack item = playerInv.getItem(slot);
-                if (item == null || item.getType() == Material.AIR || item.getType() != targetMaterial) continue;
+            ItemStack item = playerInv.getItem(slot);
+            if (item == null || item.getType() == Material.AIR || item.getType() != targetMaterial) continue;
 
-                if (item.hasItemMeta()) continue;
+            if (item.hasItemMeta()) continue;
 
-                ItemStack itemToPut;
-                if (quickSmelt) {
-                    itemToPut = QuickSmelt.checkAndRetrieve(item, player);
-                } else itemToPut = item.clone();
+            borrowed.put(slot, item);
+            item.setAmount(0);
+        }
 
-                borrowed.put(slot, itemToPut);
-                amount += item.getAmount();
-                item.setAmount(0);
+        Iterator<Map.Entry<Integer, ItemStack>> it = borrowed.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry<Integer, ItemStack> entry = it.next();
+            ItemStack item = entry.getValue();
+
+            HashMap<Integer, ItemStack> remainder;
+            if (quickSmelt) {
+                remainder = chestInv.addItem(QuickSmelt.checkAndRetrieve(item, player));
+            } else {
+                remainder = chestInv.addItem(item);
             }
+            if (!remainder.isEmpty()) break;
 
-            if (offHandAllowed) {
-                ItemStack item = playerInv.getItemInOffHand();
-                // Ugly nesting but I can't do a guard clause in simple if statements.
-                if (item == null || item.getType() == Material.AIR || item.getType() != targetMaterial) {
-                    if (item.getItemMeta() != null) {
-                        if (item.getType() == targetMaterial) {
-                            ItemStack itemToPut;
-                            if (quickSmelt) {
-                                itemToPut = QuickSmelt.checkAndRetrieve(item, player);
-                            } else itemToPut = item.clone();
+            it.remove();
+        }
 
-                            borrowed.put(40, itemToPut);
-                            amount += item.getAmount();
-                            item.setAmount(0);
-                        }
+        Location loc = event.getClickedBlock().getLocation();
+        World world = loc.getWorld();
 
-                    }
-                }
-
-            }
-
-            int alreadyOccupiedSlots = getStacks(occupiedBySame, playerHand.getMaxStackSize());
-            int emptySlotsWithoutOccupied = emptySlots + alreadyOccupiedSlots;
-            int totalStacks = getStacks((amount + occupiedBySame), playerHand.getMaxStackSize());
-            int slottable = ((totalStacks - emptySlotsWithoutOccupied) < 0) ? emptySlots : emptySlotsWithoutOccupied - totalStacks;
-            if (slottable == 0) {
-                if (occupiedBySame % playerHand.getMaxStackSize() > 1) slottable = 1; else return false;
-            }
-
-            Iterator<Map.Entry<Integer, ItemStack>> it = borrowed.entrySet().iterator();
+        if (!borrowed.isEmpty()) {
+            it = borrowed.entrySet().iterator();
             while (it.hasNext()) {
                 Map.Entry<Integer, ItemStack> entry = it.next();
                 ItemStack item = entry.getValue();
 
-                HashMap<Integer, ItemStack> remainder = chestInv.addItem(item);
-                if (!remainder.isEmpty()) break;
-
+                playerInv.setItem(entry.getKey(), item);
                 it.remove();
             }
-
-            Location loc = event.getClickedBlock().getLocation();
-            World world = loc.getWorld();
-
-            if (!borrowed.isEmpty()) {
-                it = borrowed.entrySet().iterator();
-                while (it.hasNext()) {
-                    Map.Entry<Integer, ItemStack> entry = it.next();
-                    ItemStack item = entry.getValue();
-
-                    playerInv.setItem(entry.getKey(), item);
-                    it.remove();
-                }
-            }
-
-            if (!stealthy) {
-                Sound storeSound = (event.getClickedBlock().getType() == Material.CHEST) ? Sound.BLOCK_CHEST_CLOSE : Sound.BLOCK_BARREL_CLOSE;
-                world.playSound(loc, storeSound, 1.0f, 1.0f);
-            }
-
-            return true;
         }
-        return false;
+
+        if (!stealthy) {
+            Sound storeSound = Sound.BLOCK_CHEST_CLOSE; //default
+            Block block = event.getClickedBlock();
+            if (block.getType() == Material.BARREL); storeSound = Sound.BLOCK_BARREL_CLOSE;
+            if (block.getType() == Material.SHULKER_BOX); storeSound = Sound.BLOCK_SHULKER_BOX_CLOSE;
+            if (block.getType() == Material.ENDER_CHEST); storeSound = Sound.BLOCK_ENDER_CHEST_CLOSE;
+
+            world.playSound(loc, storeSound, 1.0f, 1.0f);
+        }
+
+        return;
     }
 }
